@@ -302,7 +302,11 @@ void *clientCommunication(void *data)
 
       res = "OK";
 
-      if(strcmp(buffer, "SEND") == 0 || send_routine > 0){ 
+      if(
+         (strcasecmp(buffer, "SEND") == 0 || send_routine > 0)
+         &&
+         !(read_routine > 0 || list_routine > 0 || del_routine > 0)
+      ){ 
          printf("Entered SEND path: \n");
          if (send_routine == 0)
          {
@@ -368,8 +372,11 @@ void *clientCommunication(void *data)
          
                 
          
-      }else if (strcmp(buffer, "READ") == 0 || read_routine > 0)
-      {
+      }else if (
+         (strcasecmp(buffer, "READ") == 0 || read_routine > 0) 
+         &&
+         !(send_routine > 0 || list_routine > 0 || del_routine > 0)
+      ){
          printf("Entered READ path: \n");
          if (read_routine == 0)
          {
@@ -397,8 +404,11 @@ void *clientCommunication(void *data)
             read_routine = 0;
          }
 
-      }else if (strcmp(buffer, "LIST") == 0 || list_routine > 0)
-      {
+      }else if (
+         (strcasecmp(buffer, "LIST") == 0 || list_routine > 0)
+         &&
+         !(read_routine > 0 || send_routine > 0 || del_routine > 0)
+      ){
          printf("Entered LIST path: \n");
          if (list_routine == 0)
          {
@@ -421,8 +431,11 @@ void *clientCommunication(void *data)
 
 
 
-      }else if (strcmp(buffer, "DEL") == 0 || del_routine > 0)
-      {
+      }else if (
+         (strcasecmp(buffer, "DEL") == 0 || del_routine > 0)
+         &&
+         !(read_routine > 0 || list_routine > 0 || send_routine > 0)
+      ){
          printf("Entered DEL path: %d\n", del_routine);
          if (del_routine == 0)
          {
@@ -518,7 +531,7 @@ void *clientCommunication(void *data)
       }
 
 
-   } while (strcmp(buffer, "QUIT") != 0 && !abortRequested);
+   } while (strcasecmp(buffer, "QUIT") != 0 && !abortRequested);
 
    // closes/frees the descriptor if not already
    if (*current_socket != -1)
