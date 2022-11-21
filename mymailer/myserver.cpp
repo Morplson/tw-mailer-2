@@ -39,6 +39,7 @@ int new_socket = -1;
 
 void *clientCommunication(void *data);
 void signalHandler(int sig);
+int nextIndex(string dir_path);
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -321,7 +322,7 @@ void *clientCommunication(void *data)
          &&
          !(read_routine > 0 || list_routine > 0 || del_routine > 0 || send_routine > 0)
       ){
-         
+
          printf("LOGIN:\n");
          if (login_routine == 0){
             printf("START\n");
@@ -412,7 +413,8 @@ void *clientCommunication(void *data)
                }
 
                //TODO: NEXTINDEX
-               int index = 0;
+               int index = nextIndex(dir_path.str());
+               printf("Index: %d\n",index);
 
                std::stringstream file_path;
                file_path << dir_path.str() << "/" << index;
@@ -781,4 +783,31 @@ void signalHandler(int sig)
    {
       exit(sig);
    }
+}
+
+
+
+int nextIndex(string dir_path){
+   std::stringstream index_file;
+   index_file << dir_path << "/index.txt";
+
+   string temp_content = "";
+   int outval = 0;
+   ifstream ifs(index_file.str().c_str());
+   if (ifs)
+   {
+      ifs >> temp_content;
+
+      printf("%s\n", temp_content.c_str());
+      outval = stoi(temp_content.c_str());
+   }
+   ifs.close();
+
+   
+   ofstream ofs(index_file.str().c_str());
+
+   ofs << ++outval;
+   ofs.close();
+   
+   return outval;
 }
