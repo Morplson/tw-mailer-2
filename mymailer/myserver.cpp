@@ -316,7 +316,7 @@ void *clientCommunication(void *data)
       res = "OK";
       errorcode = 0;
 
-      /************************** SEND COMMAND *******************************/
+      /************************** LOGIN COMMAND *******************************/
       if(
          (strcasecmp(buffer, "LOGIN") == 0 || login_routine > 0)
          &&
@@ -375,7 +375,8 @@ void *clientCommunication(void *data)
                errorcode += 1;
                printf("Error: Not logged in\n");
             }
-
+            
+            messege = std::stringstream();
             send_routine = 3;
          }else if (send_routine == 3)
          {
