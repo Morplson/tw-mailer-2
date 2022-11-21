@@ -104,7 +104,7 @@ int main(int argc, char **argv)
          }
          isQuit = strcasecmp(buffer, "QUIT") == 0;
          
-         printf("mlen: %ld\n",strlen(buffer));
+         //printf("mlen: %ld\n",strlen(buffer));
 
          if (strlen(buffer) > 0){
          

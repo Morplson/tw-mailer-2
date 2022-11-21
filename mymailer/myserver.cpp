@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
 {
    //setup
    if(argc < 3){
-      perror("not enough args");
+      printf("not enough args\n");
       return EXIT_FAILURE;
    }
 
@@ -250,6 +250,11 @@ void *clientCommunication(void *data)
    int errorcode = 0;
    string res = "OK"; // OK | ERR | <output>
 
+   bool logged_in = false; // TODO: ldap login
+   int login_attempts = 0;
+   string temp_uname = "";
+   string temp_passw = "";
+
    string username = "dummy"; // aka sender
    int msg_num = 0;
 
@@ -312,16 +317,63 @@ void *clientCommunication(void *data)
 
       /************************** SEND COMMAND *******************************/
       if(
+         (strcasecmp(buffer, "LOGIN") == 0 || login_routine > 0)
+         &&
+         !(read_routine > 0 || list_routine > 0 || del_routine > 0 || send_routine > 0)
+      ){
+         
+         printf("LOGIN:\n");
+         if (login_routine == 0){
+            printf("START\n");
+            login_routine = 2;
+         }else if (login_routine == 2){
+
+            temp_uname  = buffer;
+            printf("Username: %s\n",temp_uname.c_str());
+
+            login_routine =1;
+         }else if (login_routine == 1){
+
+            temp_passw  = buffer;
+            printf("Password: %s\n",temp_passw.c_str());
+
+            //logic:
+            if (login_attempts < 3){
+
+               if (temp_passw.length() >= 4){
+                  username = temp_uname;
+                  logged_in = true;
+
+                  res = "OK: logged in successfully";
+
+                  login_attempts = 0;
+                  login_routine = 0;
+               } else {
+                  res = "ERR: login failed";
+               }
+
+               login_attempts +=1;
+            } else {
+               printf("Error: too many login attempts. \n");
+               errorcode += 1;
+            }
+         }
+      /************************** SEND COMMAND *******************************/
+      }else if(
          (strcasecmp(buffer, "SEND") == 0 || send_routine > 0)
          &&
-         !(read_routine > 0 || list_routine > 0 || del_routine > 0)
+         !(read_routine > 0 || list_routine > 0 || del_routine > 0 || login_routine > 0)
       ){
          printf("SEND: \n");
-         printf("sr: %d\n",send_routine);
          if (send_routine == 0)
          {
-            //entrypoint
-            printf("Logged in as \"%s\"",username.c_str());
+            //check login
+            if (logged_in){
+               printf("Logged in as \"%s\"\n",username.c_str());
+            }else{
+               errorcode += 1;
+               printf("Error: Not logged in\n");
+            }
 
             send_routine = 3;
          }else if (send_routine == 3)
@@ -393,12 +445,19 @@ void *clientCommunication(void *data)
       }else if (
          (strcasecmp(buffer, "READ") == 0 || read_routine > 0)
          &&
-         !(send_routine > 0 || list_routine > 0 || del_routine > 0)
+         !(send_routine > 0 || list_routine > 0 || del_routine > 0 || login_routine > 0)
       ){
          printf("READ: \n");
          if (read_routine == 0)
          {
             printf("Start\n");
+            //check login
+            if (logged_in){
+               printf("Logged in as \"%s\"\n",username.c_str());
+            }else{
+               errorcode += 1;
+               printf("Error: Not logged in\n");
+            }
 
             read_routine = 1;
          }else if (read_routine == 1)
@@ -445,11 +504,19 @@ void *clientCommunication(void *data)
       }else if (
          (strcasecmp(buffer, "LIST") == 0 || list_routine > 0)
          &&
-         !(read_routine > 0 || send_routine > 0 || del_routine > 0)
+         !(read_routine > 0 || send_routine > 0 || del_routine > 0 || login_routine > 0)
       ){
          printf("LIST: \n");
          if (list_routine == 0)
          {
+            //check login
+            if (logged_in){
+               printf("Logged in as \"%s\"\n",username.c_str());
+            }else{
+               errorcode += 1;
+               printf("Error: Not logged in\n");
+            }
+
             //logic:
             std::stringstream dir_path;
             dir_path << mailspool << "/" << username;
@@ -524,12 +591,19 @@ void *clientCommunication(void *data)
       }else if (
          (strcasecmp(buffer, "DEL") == 0 || del_routine > 0)
          &&
-         !(read_routine > 0 || list_routine > 0 || send_routine > 0)
+         !(read_routine > 0 || list_routine > 0 || send_routine > 0 || login_routine > 0)
       ){
          printf("DEL: %d\n", del_routine);
          if (del_routine == 0)
          {
             printf("Start\n");
+            //check login
+            if (logged_in){
+               printf("Logged in as \"%s\"\n",username.c_str());
+            }else{
+               errorcode += 1;
+               printf("Error: Not logged in\n");
+            }
 
             //entrypoint
             del_routine = 1;
@@ -553,7 +627,7 @@ void *clientCommunication(void *data)
                }
                else{
                   errorcode += 1;
-                  printf("Unable to delete the file");
+                  printf("Unable to delete the file\n");
                }
             }else{
                errorcode += 1;
@@ -579,6 +653,10 @@ void *clientCommunication(void *data)
          list_routine = 0;
          del_routine = 0;
 
+         int login_attempts = 0;
+         string temp_uname = "";
+         string temp_passw = "";
+
          //declare variables
          res = "404";
 
@@ -598,6 +676,10 @@ void *clientCommunication(void *data)
          read_routine = 0;
          list_routine = 0;
          del_routine = 0;
+
+         int login_attempts = 0;
+         string temp_uname = "";
+         string temp_passw = "";
 
          //declare variables
          res = "ERR";
