@@ -13,16 +13,20 @@
 #include <list>
 #include <string.h>
 #include <regex.h>
+#include <dirent.h>
 
 #include <sstream>
+#include <fstream>
 
-using namespace std;  
+using namespace std;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #define BUF 1024
 int port = 6543;
-char* mailspool;
+string mailspool = "spool";
+
+
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -49,11 +53,10 @@ int main(int argc, char *argv[])
    }
 
    int port = atoi(argv[1]);
-   char* mailspool = argv[2];
+   mailspool = argv[2];
 
-   chdir(mailspool);
 
-   printf("Port: %d\nMailspool: %s\n",port,mailspool);
+   printf("Port: %d\nMailspool: %s\n",port,mailspool.c_str());
 
 
 
@@ -236,25 +239,29 @@ void *clientCommunication(void *data)
       return NULL;
    }
 
-
-
    //declare routines
    int send_routine = 0;
    int read_routine = 0;
    int list_routine = 0;
    int del_routine = 0;
+   int login_routine = 0;
 
    //declare variables
-   int errorcode = 0;	
+   int errorcode = 0;
    string res = "OK"; // OK | ERR | <output>
 
-   string username;
+   string username = "dummy"; // aka sender
    int msg_num = 0;
 
-   string sender;
-   string reciever;
+   string receiver;
    string subject;
    std::stringstream messege;
+
+
+   //io file streams
+   ofstream wf;
+   ifstream rf;
+
 
 
    do
@@ -294,61 +301,62 @@ void *clientCommunication(void *data)
       buffer[size] = '\0';
       printf("Message received: %s\n", buffer); // ignore error
 
-   	
+
       ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       //////////////////////////////////////////////// MAILOPTIONS ///////////////////////////////////////////////////////
       ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
       res = "OK";
+      errorcode = 0;
 
+      /************************** SEND COMMAND *******************************/
       if(
          (strcasecmp(buffer, "SEND") == 0 || send_routine > 0)
          &&
          !(read_routine > 0 || list_routine > 0 || del_routine > 0)
-      ){ 
-         printf("Entered SEND path: \n");
+      ){
+         printf("SEND: \n");
+         printf("sr: %d\n",send_routine);
          if (send_routine == 0)
          {
-            printf("Start\n");
-
-            send_routine = 4;
-         }else if (send_routine = 4)
-         {
-            if(compliesWithRegex(buffer) != 0){
-               sender = buffer;
-            }else{
-               errorcode +=1;
-            }
-            
+            //entrypoint
+            printf("Logged in as \"%s\"",username.c_str());
 
             send_routine = 3;
-         }else if (send_routine = 3)
+         }else if (send_routine == 3)
          {
 
-            if(compliesWithRegex(buffer) != 0){
-               reciever = buffer;
+            if(strlen(buffer) <= 8){
+               receiver = buffer;
+               printf("Receiver: %s\n",receiver.c_str());
             }else{
                errorcode +=1;
             }
 
             send_routine = 2;
-         }else if (send_routine = 2)
+         }else if (send_routine == 2)
          {
-            subject = buffer;
+            if(strlen(buffer) <= 80){
+               subject = buffer;
+               printf("Subject: %s\n",subject.c_str());
+            }else{
+               errorcode +=1;
+            }
 
 
             send_routine = 1;
-         }else if (send_routine = 1)
+         }else if (send_routine == 1)
          {
             if(strcmp(buffer, ".") == 0){
                std::stringstream dir_path;
-               dir_path << mailspool << "/" << sender;
+               dir_path << mailspool << "/" << username;
+               printf("Dirpath: %s\n",dir_path.str().c_str());
 
                //mkdir
                int mdc = mkdir(dir_path.str().c_str(), 0755);
                if(mdc == 0){
-                  printf("Created new directory");
+                  printf("Created new directory\n");
                }
 
                //TODO: NEXTINDEX
@@ -357,123 +365,213 @@ void *clientCommunication(void *data)
                std::stringstream file_path;
                file_path << dir_path.str() << "/" << index;
 
+               wf.open(file_path.str().c_str());
+
+
+               wf << "Sender: " << username << "\n";
+               printf("Sender: \n%s\n", username.c_str());
+               wf << "Receiver: " << receiver << "\n";
+               printf("Receiver: \n%s\n", receiver.c_str());
+               wf << "Subject: " << subject << "\n";
+               printf("Subject: \n%s\n", subject.c_str());
+               wf << "Message: " << messege.str() << "\n";
+               printf("Message:\n%s\n", messege.str().c_str());
+
+               wf.close();
 
                send_routine = 0;
             }else
             {
                char *tm = buffer;
-               messege << tm;
+               messege << tm << "\n";
+
+               printf("Msg:\n************\n %s\n************\n", messege.str().c_str());
+
             }
-            
          }
-         
-         
-         
-         
-                
-         
+      /************************** READ COMMAND *******************************/
       }else if (
-         (strcasecmp(buffer, "READ") == 0 || read_routine > 0) 
+         (strcasecmp(buffer, "READ") == 0 || read_routine > 0)
          &&
          !(send_routine > 0 || list_routine > 0 || del_routine > 0)
       ){
-         printf("Entered READ path: \n");
+         printf("READ: \n");
          if (read_routine == 0)
          {
             printf("Start\n");
 
-            read_routine = 2;
-         }else if(read_routine == 2){
-            
-            username = buffer;
-
-            printf("Username: %s\n",username.c_str());
-
-            //next is 1
             read_routine = 1;
          }else if (read_routine == 1)
          {
             msg_num = atoi(buffer);
-            printf("MSG: %d\n",msg_num);
+            printf("ms_num: %d\n",msg_num);
 
-            //remove halts for some reason??
-            //TODO: fix
-            //system("cat");
+            //logic:
+            std::stringstream dir_path;
+            dir_path << mailspool << "/" << username;
+            printf("Dirpath: %s\n",dir_path.str().c_str());
+
+            if(opendir(dir_path.str().c_str()) != NULL){
+               std::stringstream file_path;
+               std::stringstream return_message;
+
+               file_path << dir_path.str() << "/" << msg_num;
+
+               rf.open(file_path.str().c_str());
+
+               string temp;
+               if (rf.is_open() )
+               {
+                  return_message << rf.rdbuf();
+
+                  rf.close();
+
+                  res = return_message.str();
+               }else{
+                  errorcode += 1;
+                  printf("Error: File not found!\n");
+               }
+            }else{
+               errorcode += 1;
+               printf("Error: dir \"%s\" does not exist.\n", dir_path.str().c_str());
+            }
+
 
             //outcon
             read_routine = 0;
          }
 
+      /************************** LIST COMMAND *******************************/
       }else if (
          (strcasecmp(buffer, "LIST") == 0 || list_routine > 0)
          &&
          !(read_routine > 0 || send_routine > 0 || del_routine > 0)
       ){
-         printf("Entered LIST path: \n");
+         printf("LIST: \n");
          if (list_routine == 0)
          {
-            printf("Start\n");
+            //logic:
+            std::stringstream dir_path;
+            dir_path << mailspool << "/" << username;
+            printf("Dirpath: %s\n",dir_path.str().c_str());
 
-            list_routine = 1;
-         }else if(list_routine = 1)
-         {
-            username = buffer;
+            struct dirent *de;
+            DIR *dr = opendir(dir_path.str().c_str());
+            if(dr != NULL){
+               std::stringstream results;
 
-            printf("Username: %s\n",username.c_str());
+               int path_no = 0;
+               while ((de = readdir(dr)) != NULL){
+                  ++path_no;
+                  if(path_no >= 3){
+                     std::stringstream file_path;
+                     file_path << dir_path.str() << "/" << de->d_name;
+                     printf("file_path: %s\n",file_path.str().c_str());
 
-            /* TODO: code */
-            //system("ls");
+                     rf.open(file_path.str().c_str());
+
+                     if(rf.is_open()){
+
+                        //Get the subject from line 3
+                        string subject_line = "";
+                        int line_no = 0;
+                        while (line_no != 3 && getline(rf, subject_line)) {
+                           ++line_no;
+                        }
+
+                        if (line_no == 3) {
+                           results << de->d_name << ": " << subject_line << "\n";
+                        } else {
+                           // The file contains fewer than two lines.
+                           errorcode += 1;
+                           printf("Error: File contains less than 3 lines.\n");
+                        }
+
+                        rf.close();
+                     }
+                  }   
+               }
+
+
+               if(!results.str().empty()) {
+                  printf("%s\n",results.str().c_str());
+                  res = results.str();
+               }else{
+                  errorcode += 1;
+                  printf("Error: Unknown!\n");
+
+               }
+
+
+               
+
+               
+               closedir(dr);
+            }else{
+               errorcode += 1;
+               printf("Error: Dir \"%s\" does not exist.\n", dir_path.str().c_str());
+            }
+
 
             //outcon
             list_routine = 0;
          }
-         
 
 
 
+
+      /************************** DEL COMMAND *******************************/
       }else if (
          (strcasecmp(buffer, "DEL") == 0 || del_routine > 0)
          &&
          !(read_routine > 0 || list_routine > 0 || send_routine > 0)
       ){
-         printf("Entered DEL path: %d\n", del_routine);
+         printf("DEL: %d\n", del_routine);
          if (del_routine == 0)
          {
             printf("Start\n");
 
             //entrypoint
-            del_routine = 2;
-         }else if(del_routine == 2){
-            
-            username = buffer;
-
-            printf("Username: %s\n",username.c_str());
-
-
-            //next is 1
             del_routine = 1;
          }else if (del_routine == 1)
          {
-            int errcon = 0;
-            msg_num = atoi(buffer);
-            printf("MSG: %d\n",msg_num);
+            msg_num = atoi(buffer);printf("ms_num: %d\n",msg_num);
 
-            //remove halts for some reason??
-            //TODO: fix
-            //remove(strcat(username, buffer));
+            //logic:
+            std::stringstream dir_path;
+            dir_path << mailspool << "/" << username;
+            printf("Dirpath: %s\n",dir_path.str().c_str());
 
-            //system("rm")
+            if(opendir(dir_path.str().c_str()) != NULL){
+               std::stringstream file_path;
+               std::stringstream return_message;
+
+               file_path << dir_path.str() << "/" << msg_num;
+
+               if (remove(file_path.str().c_str()) == 0){
+                  printf("Deleted successfully");
+               }
+               else{
+                  errorcode += 1;
+                  printf("Unable to delete the file");
+               }
+            }else{
+               errorcode += 1;
+               printf("Error: dir \"%s\" does not exist.\n", dir_path.str().c_str());
+            }
+
+            
 
             //outcon
             del_routine = 0;
          }
-         
-         
+
+
 
 
       }else
       {
-         printf("Entered no :( path: \n");
+         printf("no path \n");
 
          //declare routines
          send_routine = 0;
@@ -482,18 +580,18 @@ void *clientCommunication(void *data)
          del_routine = 0;
 
          //declare variables
-         res = "OK";
+         res = "404";
 
-         username = "";
          msg_num = 0;
 
-         sender = "";
-         reciever = "";
+         receiver = "";
          subject = "";
          messege = std::stringstream();
+
+         errorcode = 0;
       }
-      
-      
+
+
       if(errorcode>0){
          //declare routines
          send_routine = 0;
@@ -504,31 +602,37 @@ void *clientCommunication(void *data)
          //declare variables
          res = "ERR";
 
-         username = "";
          msg_num = 0;
 
-         sender = "";
-         reciever = "";
+         receiver = "";
          subject = "";
          messege = std::stringstream();
+
+         printf("this input resulted in %d errors\n", errorcode);
+         errorcode = 0;
       }
-      
-      
 
 
 
 
 
 
-      
+
+
+
       //bzero(buffer, BUF);
 
+      if(res.length()>0){
+         if (send(*current_socket, res.c_str() , strlen(res.c_str()), 0) == -1)
+         {
+            perror("send answer failed");
+            return NULL;
+         }
 
-      if (send(*current_socket, res.c_str() , strlen(res.c_str()), 0) == -1)
-      {
-         perror("send answer failed");
-         return NULL;
+         printf("\n");
       }
+
+
 
 
    } while (strcasecmp(buffer, "QUIT") != 0 && !abortRequested);
