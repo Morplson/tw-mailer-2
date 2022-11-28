@@ -18,7 +18,7 @@ CC=g++
 #           of object code produced by the compiler or that of libraries supplied with it. 
 #           These are HP-UX specific flags.
 #############################################################################################
-CFLAGS= -Wall -Wextra -O -std=c++2a -I /usr/local/include/gtest/ -pthread
+CFLAGS= -Wall -Wextra -O -std=c++2a -I /usr/local/include/gtest/ -pthread  -lldap -llber
 GTEST=/usr/local/lib/libgtest.a
 
 rebuild: clean all
