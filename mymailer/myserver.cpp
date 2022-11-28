@@ -502,7 +502,15 @@ void *clientCommunication(void *data)
                   fprintf(stderr, "LDAP bind error: %s\n", ldap_err2string(rc));
                   ldap_unbind_ext_s(ldapHandle, NULL, NULL);
                   ++errorcode;
-               } 
+               } else {
+                  username = temp_uname;
+                  logged_in = true;
+
+                  res = "OK";
+
+                  login_attempts = 0;
+                  login_routine = 0;
+               }
 
 
 
@@ -523,6 +531,13 @@ void *clientCommunication(void *data)
             } else {
                printf("Error: too many login attempts. \n");
                ++errorcode;
+
+               //reset variables
+               temp_uname = "";
+               temp_passw = "";
+               login_routine = 0;
+               login_attempts = 0;
+
             }
          }
       /************************** SEND COMMAND *******************************/
@@ -855,6 +870,7 @@ void *clientCommunication(void *data)
          res = "ERR";
 
          reset_values = true;
+
       }
 
       if(errorcode>0){
@@ -866,16 +882,12 @@ void *clientCommunication(void *data)
 
       if(reset_values){
          //reset routines
-         login_routine = 0;
          send_routine = 0;
          read_routine = 0;
          list_routine = 0;
          del_routine = 0;
 
-          //reset variables
-         login_attempts = 0;
-         temp_uname = "";
-         temp_passw = "";
+         //reset variables
 
          msg_num = 0;
 
