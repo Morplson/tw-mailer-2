@@ -9,6 +9,8 @@
 #include <signal.h>
 
 #include <sys/stat.h>
+#include <sys/wait.h>
+
 
 #include <list>
 #include <string.h>
@@ -17,6 +19,7 @@
 
 #include <sstream>
 #include <fstream>
+
 
 using namespace std;
 
@@ -138,6 +141,7 @@ int main(int argc, char *argv[])
       return EXIT_FAILURE;
    }
 
+   
    while (!abortRequested)
    {
       /////////////////////////////////////////////////////////////////////////
@@ -149,7 +153,7 @@ int main(int argc, char *argv[])
       // ACCEPTS CONNECTION SETUP
       // blocking, might have an accept-error on ctrl+c
       addrlen = sizeof(struct sockaddr_in);
-      if ((new_socket = accept(create_socket,
+      if (( new_socket = accept(create_socket,
                                (struct sockaddr *)&cliaddress,
                                &addrlen)) == -1)
       {
@@ -164,15 +168,31 @@ int main(int argc, char *argv[])
          break;
       }
 
-      /////////////////////////////////////////////////////////////////////////
-      // START CLIENT
-      // ignore printf error handling
-      printf("Client connected from %s:%d...\n",
-             inet_ntoa(cliaddress.sin_addr),
-             ntohs(cliaddress.sin_port));
-      clientCommunication(&new_socket); // returnValue can be ignored
-      new_socket = -1;
+      //create child for every client connected and make them leave loop after that
+      switch(fork())	{
+         case -1: 
+            printf("Child konnte nicht gestartet werden.");
+            exit(EXIT_FAILURE);
+            break;
+         case 0:
+
+            // START CLIENT
+            // ignore printf error handling
+            printf("Client connected from %s:%d...\n", inet_ntoa(cliaddress.sin_addr), ntohs(cliaddress.sin_port));
+
+            //open up a new thread of clientCommunication and add it to the list of threads
+            clientCommunication( &new_socket);
+
+            new_socket = -1;
+            break;
+         default:
+            break;
+      }
    }
+
+   //wait for every child process to exit
+   while(wait(NULL) > 0) {}
+   
 
    // frees the descriptor
    if (create_socket != -1)
@@ -533,7 +553,7 @@ void *clientCommunication(void *data)
                int path_no = 0;
                while ((de = readdir(dr)) != NULL){
                   ++path_no;
-                  if(path_no >= 3){
+                  if(path_no >= 3 && strcasecmp(de->d_name, "index.txt")!=0){
                      std::stringstream file_path;
                      file_path << dir_path.str() << "/" << de->d_name;
                      printf("file_path: %s\n",file_path.str().c_str());
