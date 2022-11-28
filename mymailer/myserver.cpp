@@ -737,7 +737,7 @@ void *clientCommunication(void *data)
          printf("Client is gonna quit btw \n");
          res = "OK";
 
-         reset_values;
+         reset_values = true;
       }else{
          printf("this rout doesnt exist\n");
          res = "ERR";
@@ -761,9 +761,9 @@ void *clientCommunication(void *data)
          del_routine = 0;
 
           //reset variables
-         int login_attempts = 0;
-         string temp_uname = "";
-         string temp_passw = "";
+         login_attempts = 0;
+         temp_uname = "";
+         temp_passw = "";
 
          msg_num = 0;
 
