@@ -18,7 +18,7 @@ CC=g++
 #           of object code produced by the compiler or that of libraries supplied with it. 
 #           These are HP-UX specific flags.
 #############################################################################################
-CFLAGS= -Wall -Wextra -O -std=c++2a -I /usr/local/include/gtest/ -pthread  -lldap -llber
+CFLAGS= -Wall -Wextra -O -std=c++11 -I /usr/local/include/gtest/ -pthread 
 GTEST=/usr/local/lib/libgtest.a
 
 rebuild: clean all
@@ -30,13 +30,13 @@ clean:
 
 
 ./obj/myclient.o: myclient.cpp
-	${CC} ${CFLAGS} -o obj/myclient.o myclient.cpp -c
+	${CC} ${CFLAGS} -o obj/myclient.o myclient.cpp -c 
 
 ./obj/myserver.o: myserver.cpp
-	${CC} ${CFLAGS} -o obj/myserver.o myserver.cpp -c 
+	${CC} ${CFLAGS} -o obj/myserver.o myserver.cpp -c
 
 ./bin/server: ./obj/myserver.o
-	${CC} ${CFLAGS} -o bin/server obj/myserver.o
+	${CC} ${CFLAGS} -o bin/server obj/myserver.o -lldap -llber
 
 ./bin/client: ./obj/myclient.o
 	${CC} ${CFLAGS} -o bin/client obj/myclient.o
