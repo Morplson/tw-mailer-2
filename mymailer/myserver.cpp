@@ -508,6 +508,9 @@ void *clientCommunication(void *data)
 
                   res = "OK";
 
+                  //reset variables
+                  temp_uname = "";
+                  temp_passw = "";
                   login_attempts = 0;
                   login_routine = 0;
                }
