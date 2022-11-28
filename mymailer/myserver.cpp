@@ -216,7 +216,6 @@ int main(int argc, char *argv[])
             clientCommunication( &new_socket);
 
             new_socket = -1;
-            abortRequested = true;
             break;
          default:
             break;
@@ -404,7 +403,8 @@ void *clientCommunication(void *data)
                   login_attempts = 0;
                   login_routine = 0;
                } else {
-                  res = "ERR: login failed";
+                  printf("login failed\n");
+                  res = "ERR";
                }
 
                login_attempts +=1;
@@ -637,9 +637,14 @@ void *clientCommunication(void *data)
 
 
                if(!results.str().empty()) {
-                  printf("%s\n",results.str().c_str());
-                  res = results.str();
+                  std::stringstream results_results;
+                  results_results << path_no-2 << "\n";
+                  results_results << results.str() << "\n";
+               
+                  printf("%s\n",results_results.str().c_str());
+                  res = results_results.str();
                }else{
+                  res = "0";
                   errorcode += 1;
                   printf("Error: Unknown!\n");
 
@@ -728,10 +733,14 @@ void *clientCommunication(void *data)
 
 
 
-      }else
-      {
-         printf("no path \n");
-         res = "404";
+      }else if(strcasecmp(buffer, "quit") == 0){
+         printf("Client is gonna quit btw \n");
+         res = "OK";
+
+         reset_values;
+      }else{
+         printf("this rout doesnt exist\n");
+         res = "ERR";
 
          reset_values = true;
       }
