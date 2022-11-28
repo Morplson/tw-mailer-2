@@ -21,15 +21,32 @@
 #include <fstream>
 
 
+#include <assert.h>
+#include <unistd.h>
+#include <stdbool.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <pthread.h>
+
+
+
 using namespace std;
 
-///////////////////////////////////////////////////////////////////////////////
+/// default values /////////////////////////////////////////////////////////////////////////
 
 #define BUF 1024
 int port = 6543;
 string mailspool = "spool";
 
 
+/// lock in shared memory ///////////////////////////////////////////////////////////////////////
+
+typedef struct
+{
+   pthread_mutex_t file_lock;
+   pthread_mutex_t index_lock;
+} shared_data;
+static shared_data* locks = NULL;
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -141,6 +158,21 @@ int main(int argc, char *argv[])
       return EXIT_FAILURE;
    }
 
+
+   // init locks
+   // place our shared data in shared memory
+   int prot = PROT_READ | PROT_WRITE;
+   int flags = MAP_SHARED | MAP_ANONYMOUS;
+   locks =(shared_data *) mmap(NULL, sizeof(shared_data), prot, flags, -1, 0);
+   assert(locks);
+
+   // initialise mutex so it works properly in shared memory
+   pthread_mutexattr_t attr;
+   pthread_mutexattr_init(&attr);
+   pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+   pthread_mutex_init(&locks->index_lock, &attr);
+   pthread_mutex_init(&locks->file_lock, &attr);
+
    
    while (!abortRequested)
    {
@@ -184,6 +216,7 @@ int main(int argc, char *argv[])
             clientCommunication( &new_socket);
 
             new_socket = -1;
+            abortRequested = true;
             break;
          default:
             break;
@@ -270,6 +303,7 @@ void *clientCommunication(void *data)
    //declare variables
    int errorcode = 0;
    string res = "OK"; // OK | ERR | <output>
+   bool reset_values = false;
 
    bool logged_in = false; // TODO: ldap login
    int login_attempts = 0;
@@ -423,15 +457,20 @@ void *clientCommunication(void *data)
          }else if (send_routine == 1)
          {
             if(strcmp(buffer, ".") == 0){
+
                std::stringstream dir_path;
                dir_path << mailspool << "/" << username;
                printf("Dirpath: %s\n",dir_path.str().c_str());
 
                //mkdir
+               pthread_mutex_lock(&locks->file_lock);
+               
                int mdc = mkdir(dir_path.str().c_str(), 0755);
                if(mdc == 0){
                   printf("Created new directory\n");
                }
+
+               pthread_mutex_unlock(&locks->file_lock);
 
                //TODO: NEXTINDEX
                int index = nextIndex(dir_path.str());
@@ -439,6 +478,9 @@ void *clientCommunication(void *data)
 
                std::stringstream file_path;
                file_path << dir_path.str() << "/" << index;
+
+               
+               pthread_mutex_lock(&locks->file_lock);
 
                wf.open(file_path.str().c_str());
 
@@ -453,6 +495,8 @@ void *clientCommunication(void *data)
                printf("Message:\n%s\n", messege.str().c_str());
 
                wf.close();
+
+               pthread_mutex_unlock(&locks->file_lock);
 
                send_routine = 0;
             }else
@@ -493,6 +537,9 @@ void *clientCommunication(void *data)
             dir_path << mailspool << "/" << username;
             printf("Dirpath: %s\n",dir_path.str().c_str());
 
+            
+            pthread_mutex_lock(&locks->file_lock);
+
             if(opendir(dir_path.str().c_str()) != NULL){
                std::stringstream file_path;
                std::stringstream return_message;
@@ -517,6 +564,9 @@ void *clientCommunication(void *data)
                errorcode += 1;
                printf("Error: dir \"%s\" does not exist.\n", dir_path.str().c_str());
             }
+
+         
+            pthread_mutex_unlock(&locks->file_lock);
 
 
             //outcon
@@ -544,6 +594,9 @@ void *clientCommunication(void *data)
             std::stringstream dir_path;
             dir_path << mailspool << "/" << username;
             printf("Dirpath: %s\n",dir_path.str().c_str());
+
+            
+            pthread_mutex_lock(&locks->file_lock);
 
             struct dirent *de;
             DIR *dr = opendir(dir_path.str().c_str());
@@ -602,6 +655,9 @@ void *clientCommunication(void *data)
                printf("Error: Dir \"%s\" does not exist.\n", dir_path.str().c_str());
             }
 
+            
+            pthread_mutex_unlock(&locks->file_lock);
+
 
             //outcon
             list_routine = 0;
@@ -639,6 +695,9 @@ void *clientCommunication(void *data)
             dir_path << mailspool << "/" << username;
             printf("Dirpath: %s\n",dir_path.str().c_str());
 
+            
+            pthread_mutex_lock(&locks->file_lock);
+
             if(opendir(dir_path.str().c_str()) != NULL){
                std::stringstream file_path;
                std::stringstream return_message;
@@ -658,6 +717,9 @@ void *clientCommunication(void *data)
             }
 
             
+            pthread_mutex_unlock(&locks->file_lock);
+
+            
 
             //outcon
             del_routine = 0;
@@ -669,43 +731,30 @@ void *clientCommunication(void *data)
       }else
       {
          printf("no path \n");
-
-         //declare routines
-         send_routine = 0;
-         read_routine = 0;
-         list_routine = 0;
-         del_routine = 0;
-
-         int login_attempts = 0;
-         string temp_uname = "";
-         string temp_passw = "";
-
-         //declare variables
          res = "404";
 
-         msg_num = 0;
-
-         receiver = "";
-         subject = "";
-         messege = std::stringstream();
-
-         errorcode = 0;
+         reset_values = true;
       }
 
-
       if(errorcode>0){
-         //declare routines
+         printf("this input resulted in %d errors\n", errorcode);
+         res = "ERR";
+         
+         reset_values = true;
+      }
+
+      if(reset_values){
+         //reset routines
+         login_routine = 0;
          send_routine = 0;
          read_routine = 0;
          list_routine = 0;
          del_routine = 0;
 
+          //reset variables
          int login_attempts = 0;
          string temp_uname = "";
          string temp_passw = "";
-
-         //declare variables
-         res = "ERR";
 
          msg_num = 0;
 
@@ -713,8 +762,10 @@ void *clientCommunication(void *data)
          subject = "";
          messege = std::stringstream();
 
-         printf("this input resulted in %d errors\n", errorcode);
+         
          errorcode = 0;
+         
+         reset_values = false;
       }
 
 
@@ -809,6 +860,8 @@ void signalHandler(int sig)
 
 
 int nextIndex(string dir_path){
+   pthread_mutex_lock(&locks->index_lock);
+
    std::stringstream index_file;
    index_file << dir_path << "/index.txt";
 
@@ -829,6 +882,9 @@ int nextIndex(string dir_path){
 
    ofs << ++outval;
    ofs.close();
+
+   
+   pthread_mutex_unlock(&locks->index_lock);
    
    return outval;
 }
