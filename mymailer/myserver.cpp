@@ -256,33 +256,6 @@ int main(int argc, char *argv[])
 
 
 
-int compliesWithRegex(char* input)
-{
-   regex_t regex;
-   int reti;
-
-   /* Compile regular expression */
-   reti = regcomp(&regex, "^[a-z0-9]{1,10}$", 0);
-   if (reti) {
-      printf("Could not compile regex\n");
-      return 0;
-      //exit(1);
-   }
-
-   /* Execute regular expression */
-   reti = regexec(&regex, input, 0, NULL, 0);
-   if (!reti) {
-      return 1;
-   }
-   else {
-      //regerror(reti, &regex, input, sizeof(input));
-      //printf("Regex match failed: %s\n", input);
-      return 0;
-   }
-}
-
-
-
 
 
 
@@ -442,7 +415,7 @@ void *clientCommunication(void *data)
                {
                   // https://www.openldap.org/software/man.cgi?query=ldap_err2string&sektion=3&apropos=0&manpath=OpenLDAP+2.4-Release
                   fprintf(stderr, "ldap_set_option(PROTOCOL_VERSION): %s\n", ldap_err2string(rc));
-                  ldap_unbind_ext_s(ldapHandle, NULL, NULL);
+                  //ldap_unbind_ext_s(ldapHandle, NULL, NULL);
                   ++errorcode;
                }
                ////////////////////////////////////////////////////////////////////////////
@@ -468,7 +441,7 @@ void *clientCommunication(void *data)
                if (rc != LDAP_SUCCESS)
                {
                   fprintf(stderr, "ldap_start_tls_s(): %s\n", ldap_err2string(rc));
-                  ldap_unbind_ext_s(ldapHandle, NULL, NULL);
+                  //ldap_unbind_ext_s(ldapHandle, NULL, NULL);
                   ++errorcode;
                }
                ////////////////////////////////////////////////////////////////////////////
@@ -1024,3 +997,4 @@ int nextIndex(string dir_path){
    
    return outval;
 }
+//line100
